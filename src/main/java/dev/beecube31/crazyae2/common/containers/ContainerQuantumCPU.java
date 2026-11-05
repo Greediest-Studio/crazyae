@@ -5,13 +5,10 @@ import dev.beecube31.crazyae2.client.gui.CrazyAESlot;
 import dev.beecube31.crazyae2.common.containers.base.CrazyAEBaseContainer;
 import dev.beecube31.crazyae2.common.containers.base.slot.RestrictedSlot;
 import dev.beecube31.crazyae2.common.tile.crafting.TileQuantumCPU;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.inventory.ClickType;
+import net.minecraft.inventory.IContainerListener;
 import net.minecraft.inventory.Slot;
-import net.minecraft.item.ItemStack;
 import net.minecraftforge.items.IItemHandler;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,10 +23,6 @@ public class ContainerQuantumCPU extends CrazyAEBaseContainer {
     public ContainerQuantumCPU(final InventoryPlayer ip, final TileQuantumCPU te) {
         super(ip, te);
         this.quantumCPU = te;
-
-        if (this.quantumCPU != null && this.quantumCPU.getInventoryByName("patterns") != null) {
-            setCurrentPage(0);
-        }
 
         this.setupConfig();
 
@@ -65,6 +58,11 @@ public class ContainerQuantumCPU extends CrazyAEBaseContainer {
 
         this.currentPage = newPage;
         updatePatternSlots();
+
+        // 即使两页对应槽位的物品相同，也要同步新页，避免客户端保留过期内容。
+        for (IContainerListener listener : this.listeners) {
+            listener.sendAllContents(this, this.getInventory());
+        }
     }
 
     private void updatePatternSlots() {
@@ -72,17 +70,13 @@ public class ContainerQuantumCPU extends CrazyAEBaseContainer {
             return;
         }
 
-        for (Slot slot : patternSlotsOnPage) {
-            this.inventorySlots.remove(slot);
-        }
-        patternSlotsOnPage.clear();
-
         final IItemHandler patternsHandler = this.quantumCPU.getInventoryByName("patterns");
         int startIndex = this.currentPage * SLOTS_PER_PAGE;
 
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
-                int slotIndexInFullInv = startIndex + (x + y * 8);
+                int slotIndexOnPage = x + y * 8;
+                int slotIndexInFullInv = startIndex + slotIndexOnPage;
                 if (slotIndexInFullInv < patternsHandler.getSlots()) {
                     CrazyAESlot patternSlot = new RestrictedSlot(
                             RestrictedSlot.PlaceableItemType.ENCODED_CRAFTING_PATTERN,
@@ -92,8 +86,16 @@ public class ContainerQuantumCPU extends CrazyAEBaseContainer {
                             15 + y * 18,
                             this.getInventoryPlayer()
                     ).setStackLimit(1);
-                    this.addSlotToContainer(patternSlot);
-                    patternSlotsOnPage.add(patternSlot);
+                    if (slotIndexOnPage < this.patternSlotsOnPage.size()) {
+                        // 原位替换样板映射，保持背包槽编号和同步缓存的位置不变。
+                        Slot previousSlot = this.patternSlotsOnPage.set(slotIndexOnPage, patternSlot);
+                        patternSlot.slotNumber = previousSlot.slotNumber;
+                        patternSlot.setContainer(this);
+                        this.inventorySlots.set(patternSlot.slotNumber, patternSlot);
+                    } else {
+                        this.addSlotToContainer(patternSlot);
+                        this.patternSlotsOnPage.add(patternSlot);
+                    }
                 }
             }
         }
@@ -106,11 +108,6 @@ public class ContainerQuantumCPU extends CrazyAEBaseContainer {
         }
     }
 
-
-    @Override
-    public @NotNull ItemStack slotClick(int slotID, int dragType, @NotNull ClickType clickTypeIn, @NotNull EntityPlayer player) {
-        return super.slotClick(slotID, dragType, clickTypeIn, player);
-    }
 
     @Override
     public void detectAndSendChanges() {
