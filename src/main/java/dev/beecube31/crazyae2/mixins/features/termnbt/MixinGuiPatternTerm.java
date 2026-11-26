@@ -29,7 +29,7 @@ import java.io.IOException;
 @SideOnly(Side.CLIENT)
 public abstract class MixinGuiPatternTerm extends GuiMEMonitorable implements IJEIGhostIngredients {
 
-    @Shadow @Final private ContainerPatternEncoder container;
+    @Shadow(remap = false) @Final private ContainerPatternEncoder container;
 
     @Unique private StaticImageButton crazyae$clearItemNBT;
 

@@ -2,6 +2,7 @@ package dev.beecube31.crazyae2.common.recipes.handlers;
 
 import appeng.api.AEApi;
 import appeng.api.definitions.IItemDefinition;
+import appeng.api.implementations.items.IStorageCell;
 import appeng.api.storage.data.IAEStack;
 import appeng.api.storage.data.IItemList;
 import dev.beecube31.crazyae2.core.CrazyAE;
@@ -13,6 +14,7 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -29,7 +31,7 @@ public final class DisassembleRecipe extends net.minecraftforge.registries.IForg
 		final var items = definitions.items();
 		final var mats = definitions.materials();
 
-		this.cellMappings = new HashMap<>(15);
+		this.cellMappings = new HashMap<>(40);
 		this.nonCellMappings = new HashMap<>(11);
 
 		this.cellMappings.put(items.storageCell256K(), mats.cellPart256K());
@@ -41,14 +43,40 @@ public final class DisassembleRecipe extends net.minecraftforge.registries.IForg
 		this.cellMappings.put(items.storageCell1GB(), mats.cellPart1GB());
 		this.cellMappings.put(items.storageCell2GB(), mats.cellPart2GB());
 
-		this.cellMappings.put(items.fluidStorageCell256K(), mats.cellPart256K());
-		this.cellMappings.put(items.fluidStorageCell1MB(), mats.cellPart1MB());
-		this.cellMappings.put(items.fluidStorageCell4MB(), mats.cellPart4MB());
-		this.cellMappings.put(items.fluidStorageCell16MB(), mats.cellPart16MB());
-		this.cellMappings.put(items.fluidStorageCell64MB(), mats.cellPart64MB());
-		this.cellMappings.put(items.fluidStorageCell256MB(), mats.cellPart256MB());
-		this.cellMappings.put(items.fluidStorageCell1GB(), mats.cellPart1GB());
-		this.cellMappings.put(items.fluidStorageCell2GB(), mats.cellPart2GB());
+		this.cellMappings.put(items.fluidStorageCell256K(), mats.cellFluidPart256K());
+		this.cellMappings.put(items.fluidStorageCell1MB(), mats.cellFluidPart1MB());
+		this.cellMappings.put(items.fluidStorageCell4MB(), mats.cellFluidPart4MB());
+		this.cellMappings.put(items.fluidStorageCell16MB(), mats.cellFluidPart16MB());
+		this.cellMappings.put(items.fluidStorageCell64MB(), mats.cellFluidPart64MB());
+		this.cellMappings.put(items.fluidStorageCell256MB(), mats.cellFluidPart256MB());
+		this.cellMappings.put(items.fluidStorageCell1GB(), mats.cellFluidPart1GB());
+		this.cellMappings.put(items.fluidStorageCell2GB(), mats.cellFluidPart2GB());
+
+		this.cellMappings.put(items.manaCell1k(), mats.manaPart1k());
+		this.cellMappings.put(items.manaCell4k(), mats.manaPart4k());
+		this.cellMappings.put(items.manaCell16k(), mats.manaPart16k());
+		this.cellMappings.put(items.manaCell64k(), mats.manaPart64k());
+		this.cellMappings.put(items.manaCell256k(), mats.manaPart256k());
+		this.cellMappings.put(items.manaCell1MB(), mats.manaPart1mb());
+		this.cellMappings.put(items.manaCell4MB(), mats.manaPart4mb());
+		this.cellMappings.put(items.manaCell16MB(), mats.manaPart16mb());
+		this.cellMappings.put(items.manaCell64MB(), mats.manaPart64mb());
+		this.cellMappings.put(items.manaCell256MB(), mats.manaPart256mb());
+		this.cellMappings.put(items.manaCell1GB(), mats.manaPart1gb());
+		this.cellMappings.put(items.manaCell2GB(), mats.manaPart2gb());
+
+		this.cellMappings.put(items.energyCell1k(), mats.energyPart1k());
+		this.cellMappings.put(items.energyCell4k(), mats.energyPart4k());
+		this.cellMappings.put(items.energyCell16k(), mats.energyPart16k());
+		this.cellMappings.put(items.energyCell64k(), mats.energyPart64k());
+		this.cellMappings.put(items.energyCell256k(), mats.energyPart256k());
+		this.cellMappings.put(items.energyCell1MB(), mats.energyPart1mb());
+		this.cellMappings.put(items.energyCell4MB(), mats.energyPart4mb());
+		this.cellMappings.put(items.energyCell16MB(), mats.energyPart16mb());
+		this.cellMappings.put(items.energyCell64MB(), mats.energyPart64mb());
+		this.cellMappings.put(items.energyCell256MB(), mats.energyPart256mb());
+		this.cellMappings.put(items.energyCell1GB(), mats.energyPart1gb());
+		this.cellMappings.put(items.energyCell2GB(), mats.energyPart2gb());
 
 		this.nonCellMappings.put(blocks.craftingStorage256k(), mats.cellPart256K());
 		this.nonCellMappings.put(blocks.craftingStorage1mb(), mats.cellPart1MB());
@@ -62,19 +90,30 @@ public final class DisassembleRecipe extends net.minecraftforge.registries.IForg
 		this.nonCellMappings.put(blocks.craftingStorage32gb(), mats.cellPart32GB());
 		this.nonCellMappings.put(blocks.craftingStorage128gb(), mats.cellPart128GB());
 	}
-	
+
 	@SuppressWarnings("unchecked")
+	@Nullable
 	private static <T extends IAEStack<T>> IItemList<T> getStorageList(final ItemStack stack) {
-		var item = (IAEStack<T>) stack.getItem();
-		var channel = item.getChannel();
+		if (!(stack.getItem() instanceof IStorageCell<?>)) {
+			return null;
+		}
+
+		final var item = (IStorageCell<T>) stack.getItem();
+		final var channel = item.getChannel();
+		if (channel == null) {
+			return null;
+		}
 
 		// make sure the storage cell is empty...
-		var cellInv = AEApi.instance()
+		final var cellInv = AEApi.instance()
 			.registries()
 			.cell()
 			.getCellInventory(stack, null, channel);
 
-		assert cellInv != null;
+		if (cellInv == null) {
+			return null;
+		}
+
 		return cellInv.getAvailableItems(channel.createList());
 	}
 
@@ -100,13 +139,12 @@ public final class DisassembleRecipe extends net.minecraftforge.registries.IForg
 				// handle storage cells
 				var maybeCellOutput = this.getCellOutput(stackInSlot);
 				if (maybeCellOutput.isPresent()) {
-					var storageCellStack = maybeCellOutput.get();
-					var storageList = getStorageList(storageCellStack);
-					if (storageList.isEmpty()) {
+					var storageList = getStorageList(stackInSlot);
+					if (storageList != null && !storageList.isEmpty()) {
 						return MISMATCHED_STACK;
 					}
 
-					output = storageCellStack;
+					output = maybeCellOutput.get();
 				}
 
 				// handle crafting storage blocks
